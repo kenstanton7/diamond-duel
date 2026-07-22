@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Diamond Duel: Home Run Showdown</title>
+    <title>The Diamond Duel: Stat Showdown</title>
     <style>
         :root { 
             --off-white: #fdfaf0; 
@@ -13,35 +13,30 @@
             --fire-orange: #ff4500;
             --fire-glow: rgba(255, 69, 0, 0.8);
 
-            /* DEFAULT: HOME RUN MODE (MIDNIGHT BLUE & SEAM RED) */
+            /* DEFAULT: HOME RUN MODE */
             --primary-bg: #0b1c2c;
             --header-bg: #040a14; 
             --accent-color: #d32f2f; 
             --text-gold: #ffffff;
             --card-border: #94a3b8;
             
-            /* Sharp Black Shadow globally applied for perfect readability */
             --title-color: #ffffff;
             --title-shadow: #000000;
             --vs-color: #ffffff;
             --vs-shadow: #000000;
         }
 
-        /* HITS MODE THEME (OUTFIELD IVY & TROPHY GOLD) */
         body.mode-hits {
             --primary-bg: #112a1e; 
             --header-bg: #06140e; 
             --accent-color: #d4af37; 
-            --text-gold: #ffffff;
             --card-border: #8b9c91;
         }
 
-        /* STRIKEOUT MODE THEME (CHARCOAL & ELECTRIC VELOCITY BLUE) */
         body.mode-strikeOuts {
             --primary-bg: #1c1c22; 
             --header-bg: #0d0d12; 
             --accent-color: #0284c7; 
-            --text-gold: #ffffff;
             --card-border: #6b7280;
         }
 
@@ -65,25 +60,27 @@
             transition: color 0.5s, text-shadow 0.5s;
         }
 
-        .mode-select {
+        .dropdown-container {
             position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 5px;
+        }
+
+        .mode-select, .style-select {
             background: var(--vintage-cream); color: #111; border: 2px solid var(--accent-color); 
-            padding: 5px; font-weight: 800; border-radius: 4px; cursor: pointer; font-family: var(--clean-font); 
-            font-size: 0.75rem; transition: color 0.5s, border 0.5s;
+            padding: 4px; font-weight: 800; border-radius: 4px; cursor: pointer; font-family: var(--clean-font); 
+            font-size: 0.7rem; transition: color 0.5s, border 0.5s; width: 130px;
         }
 
         .help-btn {
             position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
             background: var(--vintage-cream); color: #111; border: none; padding: 6px 12px; 
             border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 0.7rem;
-            transition: background 0.5s, color 0.5s;
         }
 
         .mute-btn {
             position: absolute; right: 85px; top: 50%; transform: translateY(-50%);
             background: var(--vintage-cream); color: #111; border: none; padding: 6px 10px; 
             border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 0.7rem;
-            transition: background 0.5s, color 0.5s;
         }
 
         .stats-bar {
@@ -133,11 +130,9 @@
             background: radial-gradient(circle, var(--header-bg) 0%, #000 150%);
             color: var(--off-white); font-family: 'Impact', sans-serif; font-size: 8rem;
             letter-spacing: 2px; text-shadow: 4px 4px 0px var(--accent-color);
-            transition: background 0.5s, text-shadow 0.5s;
         }
         
         .result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; z-index: 5; pointer-events: none; }
-
         .player-name { font-family: 'Impact', sans-serif; font-size: 1.8rem; color: var(--header-bg); margin: 8px 0; line-height: 1.1; min-height: 4rem; text-align: center; display: flex; align-items: center; justify-content: center; text-transform: uppercase; transition: color 0.5s;}
 
         .hr-container { text-align: center; height: 90px; display: flex; flex-direction: column; justify-content: center; background: rgba(0,0,0,0.03); border-radius: 10px; margin-top: 5px; }
@@ -161,9 +156,13 @@
         .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; width: 100%; }
         .btn-social { color: white; font-size: 0.8rem; padding: 10px; }
 
+        /* LOADING SPINNER */
+        .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         @media (max-width: 600px) { 
             h1 { font-size: 1.8rem; } 
-            .mode-select { position: relative; left: 0; transform: none; margin-bottom: 5px; top: 0; }
+            .dropdown-container { position: relative; left: 0; transform: none; margin-bottom: 5px; top: 0; align-items: center; flex-direction: row; justify-content: center; }
             .help-btn { right: 10px; padding: 6px 8px; }
             .mute-btn { right: 70px; padding: 6px 8px; }
         }
@@ -172,11 +171,18 @@
 <body>
 
 <header>
-    <select id="game-mode" class="mode-select" onchange="handleModeSwitch()">
-        <option value="homeRuns">Home Run Mode</option>
-        <option value="hits">Hits Mode</option>
-        <option value="strikeOuts">Strikeout Mode</option> 
-    </select>
+    <div class="dropdown-container">
+        <select id="play-style" class="style-select" onchange="handleModeSwitch()">
+            <option value="unlimited">Unlimited Mode</option>
+            <option value="daily">Daily 9-Inning Mode</option>
+        </select>
+        <select id="game-mode" class="mode-select" onchange="handleModeSwitch()">
+            <option value="homeRuns">Home Run Mode</option>
+            <option value="hits">Hits Mode</option>
+            <option value="strikeOuts">Strikeout Mode</option> 
+        </select>
+    </div>
+    
     <h1 id="main-title">THE DIAMOND DUEL</h1>
     <div id="sub-title" style="font-weight: bold; color: var(--accent-color); letter-spacing: 2px; font-size: 0.8rem; transition: color 0.5s;">HOME RUN SHOWDOWN</div>
     <button id="mute-btn" class="mute-btn" onclick="toggleMute()">🔊 Sound</button>
@@ -184,9 +190,9 @@
 </header>
 
 <div class="stats-bar" id="status-bar">
-    <div class="stat-box">SCORE: <span id="score">0</span></div>
+    <div class="stat-box"><span id="score-label">SCORE: </span>&nbsp;<span id="score">0</span></div>
     <div class="stat-box" style="color:var(--accent-color); transition: color 0.5s;">OUTS: <span id="strikes">⚪⚪⚪</span></div>
-    <div class="stat-box">BEST: <span id="high-score">0</span></div>
+    <div class="stat-box" id="high-score-box">BEST: <span id="high-score">0</span></div>
     <div class="stat-box" id="fire-indicator">🔥 YOU'RE ON FIRE!</div>
 </div>
 
@@ -219,14 +225,23 @@
     </div>
 </div>
 
+<!-- NEW LOADING MODAL FOR DAILY MODE -->
+<div id="loading-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="font-family: 'Impact'; color: var(--header-bg); font-size: 2rem; margin-top:0;">PREPPING THE FIELD</h2>
+        <p style="font-weight: 600;">Generating today's custom 9-Inning Showdown...</p>
+        <div class="spinner"></div>
+    </div>
+</div>
+
 <div id="game-over-modal" class="modal">
     <div class="modal-content">
-        <h1 style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
+        <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
         
-        <button class="btn close-modal" onclick="resetGame()">PLAY AGAIN</button>
+        <button id="play-again-btn" class="btn close-modal" onclick="resetGame()">PLAY AGAIN</button>
         
         <div class="share-grid">
             <button class="btn btn-social" style="background:#555" onclick="share('copy')">📋 Copy Text</button>
@@ -242,30 +257,51 @@
     let leftData, rightData, score = 0, strikes = 0, currentStreak = 0, busy = false;
     let isMuted = false;
 
+    // DAILY MODE VARIABLES
+    let dailyPairs = [];
+    let dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+
     // AUDIO SETUP 
     const sfxCrack = new Audio('crack.mp3');
     const sfxPop = new Audio('pop.mp3');
     const sfxRoar = new Audio('roar.mp3');
     const sfxCheer = new Audio('cheer.mp3'); 
-    
-    sfxCrack.volume = 0.6;
-    sfxPop.volume = 0.5;
-    sfxRoar.volume = 0.4;
-    sfxCheer.volume = 0.6; 
+    sfxCrack.volume = 0.6; sfxPop.volume = 0.5; sfxRoar.volume = 0.4; sfxCheer.volume = 0.6; 
+
+    // --- MATH LOGIC FOR SEEDED DAILY RANDOMIZER ---
+    function cyrb128(str) {
+        let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+        for (let i = 0, k; i < str.length; i++) {
+            k = str.charCodeAt(i);
+            h1 = h2 ^ Math.imul(h1 ^ k, 597399067); h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+            h3 = h4 ^ Math.imul(h3 ^ k, 951274213); h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+        }
+        h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067); h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+        h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213); h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+        return [(h1^h2^h3^h4)>>>0, (h2^h1)>>>0, (h3^h1)>>>0, (h4^h1)>>>0];
+    }
+    function xfc32(a, b, c, d) {
+        return function() {
+            a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+            var t = (a + b) | 0; a = b ^ b >>> 9; b = c + (c << 3) | 0;
+            c = (c << 21 | c >>> 11); d = d + 1 | 0; t = t + d | 0; c = c + t | 0;
+            return (t >>> 0) / 4294967296;
+        }
+    }
 
     function toggleMute() {
         isMuted = !isMuted;
         const muteBtn = document.getElementById('mute-btn');
-        if (isMuted) {
-            muteBtn.innerText = "🔇 Muted";
-            muteBtn.style.opacity = "0.7";
-        } else {
-            muteBtn.innerText = "🔊 Sound";
-            muteBtn.style.opacity = "1";
-        }
+        if (isMuted) { muteBtn.innerText = "🔇 Muted"; muteBtn.style.opacity = "0.7"; } 
+        else { muteBtn.innerText = "🔊 Sound"; muteBtn.style.opacity = "1"; }
     }
 
     function getHighScoreKey() { return `diamond_duel_high_${document.getElementById('game-mode').value}`; }
+    function getDailyKey() {
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' + (today.getMonth()+1) + '-' + today.getDate();
+        return `diamond_daily_${document.getElementById('game-mode').value}_${dateStr}`;
+    }
 
     function updateHighScoreDisplay() {
         let hs = localStorage.getItem(getHighScoreKey()) || 0;
@@ -289,33 +325,40 @@
 
     function updateTheme() {
         const mode = document.getElementById('game-mode').value;
+        const style = document.getElementById('play-style').value;
         const body = document.body;
         const ruleText = document.getElementById('rule-text');
         
         body.classList.remove('mode-hits', 'mode-strikeOuts');
 
+        let modeDesc = "";
         if (mode === 'hits') {
             body.classList.add('mode-hits');
             document.getElementById('sub-title').innerText = "HIT SHOWDOWN";
-            document.title = "The Diamond Duel: Hit Showdown";
-            ruleText.innerHTML = "Out of the two players shown, pick the one with the <strong>most career hits</strong>.<br><br>This mode features players who were active between 2000-2026 and accumulated <strong>at least 300 hits</strong>.<br><br><span style='color: var(--accent-color); font-weight: 900; font-size: 1.1em;'>IMPORTANT:</span> Numbers reflect their <strong>entire lifetime career</strong>!";
+            modeDesc = "<strong>most career hits</strong>.<br><br>This mode features players with <strong>at least 300 hits</strong>.";
         } else if (mode === 'strikeOuts') {
             body.classList.add('mode-strikeOuts');
             document.getElementById('sub-title').innerText = "STRIKEOUT SHOWDOWN";
-            document.title = "The Diamond Duel: Strikeout Showdown";
-            ruleText.innerHTML = "Out of the two pitchers shown, pick the one with the <strong>most career strikeouts</strong>.<br><br>This mode features elite pitchers active between 2000-2026 who recorded <strong>at least 500 career strikeouts</strong>.<br><br><span style='color: var(--accent-color); font-weight: 900; font-size: 1.1em;'>IMPORTANT:</span> Numbers reflect their <strong>entire lifetime career</strong>!";
+            modeDesc = "<strong>most career strikeouts</strong>.<br><br>This mode features pitchers with <strong>at least 500 strikeouts</strong>.";
         } else {
             document.getElementById('sub-title').innerText = "HOME RUN SHOWDOWN";
-            document.title = "The Diamond Duel: Home Run Showdown";
-            ruleText.innerHTML = "Out of the two players shown, pick the one with the <strong>most career home runs</strong>.<br><br>This mode features players who were active between 2000-2026 and launched <strong>at least 50 home runs</strong>.<br><br><span style='color: var(--accent-color); font-weight: 900; font-size: 1.1em;'>IMPORTANT:</span> Numbers reflect their <strong>entire lifetime career</strong>!";
+            modeDesc = "<strong>most career home runs</strong>.<br><br>This mode features players with <strong>at least 50 home runs</strong>.";
+        }
+        
+        if (style === 'daily') {
+            ruleText.innerHTML = `<strong>DAILY MODE:</strong> Play a curated 9-Inning game.<br><br>Out of the two players shown, pick the one with the ${modeDesc}<br><br><span style='color: var(--accent-color); font-weight: 900; font-size: 1em;'>The gap gets smaller every inning! Can you beat all 9?</span>`;
+            document.getElementById('score-label').innerText = "INNING:";
+            document.getElementById('high-score-box').style.display = 'none';
+        } else {
+            ruleText.innerHTML = `<strong>UNLIMITED MODE:</strong> Survive as long as you can.<br><br>Out of the two players shown, pick the one with the ${modeDesc}<br><br><span style='color: var(--accent-color); font-weight: 900; font-size: 1.1em;'>IMPORTANT:</span> Numbers reflect their <strong>entire lifetime career</strong>!`;
+            document.getElementById('score-label').innerText = "SCORE:";
+            document.getElementById('high-score-box').style.display = 'flex';
         }
         updateHighScoreDisplay();
     }
 
     function resetImageStyle(imgElement) {
-        imgElement.style.display = 'block';
-        imgElement.style.objectFit = 'cover';
-        
+        imgElement.style.display = 'block'; imgElement.style.objectFit = 'cover';
         let wrapper = imgElement.parentElement;
         let fallbackDiv = wrapper.querySelector('.initials-fallback');
         if (fallbackDiv) wrapper.removeChild(fallbackDiv);
@@ -323,72 +366,85 @@
 
     function setFallbackImage(imgElement, fullName) {
         imgElement.style.display = 'none'; 
-        
         let wrapper = imgElement.parentElement;
         let fallbackDiv = wrapper.querySelector('.initials-fallback');
-        
         if (!fallbackDiv) {
-            fallbackDiv = document.createElement('div');
-            fallbackDiv.className = 'initials-fallback';
-            wrapper.appendChild(fallbackDiv);
+            fallbackDiv = document.createElement('div'); fallbackDiv.className = 'initials-fallback'; wrapper.appendChild(fallbackDiv);
         }
-        
         let parts = fullName.split(' ');
         let initials = parts[0][0];
         if (parts.length > 1) initials += parts[parts.length - 1][0];
-        
         fallbackDiv.innerText = initials.toUpperCase();
     }
 
     async function fetchWikiImage(name, imgElement) {
         try {
             const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(name)}|${encodeURIComponent(name + " (baseball)")}&prop=pageimages&format=json&pithumbsize=500&origin=*`;
-            const response = await fetch(url);
-            const data = await response.json();
-            const pages = data.query.pages;
-            
+            const r = await fetch(url); const d = await r.json(); const pages = d.query.pages;
             let foundImg = null;
-            for (let id in pages) {
-                if (id !== "-1" && pages[id].thumbnail) {
-                    foundImg = pages[id].thumbnail.source;
-                    break;
-                }
-            }
-            
-            if (foundImg) {
-                imgElement.src = foundImg;
-                imgElement.onerror = () => setFallbackImage(imgElement, name);
-            } else {
-                setFallbackImage(imgElement, name); 
-            }
-        } catch (e) {
-            setFallbackImage(imgElement, name);
-        }
+            for (let id in pages) { if (id !== "-1" && pages[id].thumbnail) { foundImg = pages[id].thumbnail.source; break; } }
+            if (foundImg) { imgElement.src = foundImg; imgElement.onerror = () => setFallbackImage(imgElement, name); } 
+            else { setFallbackImage(imgElement, name); }
+        } catch (e) { setFallbackImage(imgElement, name); }
     }
 
     async function loadPlayerImage(imgElement, id, name) {
-        const modernUrl = `https://img.mlbstatic.com/mlb-photos/image/upload/w_426,q_auto:best/v1/people/${id}/headshot/67/current?v=${new Date().getTime()}`;
-
+        const url = `https://img.mlbstatic.com/mlb-photos/image/upload/w_426,q_auto:best/v1/people/${id}/headshot/67/current?v=${new Date().getTime()}`;
         try {
-            const response = await fetch(modernUrl);
-            
-            if (!response.ok) {
-                fetchWikiImage(name, imgElement);
-                return;
-            }
+            const r = await fetch(url);
+            if (!r.ok) { fetchWikiImage(name, imgElement); return; }
+            const blob = await r.blob();
+            if (blob.size < 12000) { fetchWikiImage(name, imgElement); } 
+            else { const objURL = URL.createObjectURL(blob); imgElement.src = objURL; imgElement.onload = () => URL.revokeObjectURL(objURL); imgElement.onerror = () => fetchWikiImage(name, imgElement); }
+        } catch(e) { fetchWikiImage(name, imgElement); }
+    }
 
-            const blob = await response.blob();
-            
-            if (blob.size < 12000) {
-                fetchWikiImage(name, imgElement); 
-            } else {
-                const objectURL = URL.createObjectURL(blob);
-                imgElement.src = objectURL;
-                imgElement.onload = () => URL.revokeObjectURL(objectURL);
-                imgElement.onerror = () => fetchWikiImage(name, imgElement); 
-            }
-        } catch(e) {
-            fetchWikiImage(name, imgElement);
+    async function initDailyMode() {
+        document.getElementById('loading-modal').style.display = 'flex';
+        const mode = document.getElementById('game-mode').value;
+        const dailyKey = getDailyKey();
+        
+        let saved = localStorage.getItem(dailyKey);
+        if (saved) {
+            dailyState = JSON.parse(saved);
+        } else {
+            dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+        }
+
+        const seedStr = dailyKey;
+        const seed = cyrb128(seedStr);
+        const rand = xfc32(seed[0], seed[1], seed[2], seed[3]);
+        const pool = (mode === 'homeRuns') ? homeRunPool : (mode === 'hits') ? hitsPool : strikeoutsPool;
+
+        let tempPairs = [];
+        for(let i=0; i<9; i++) {
+            let p1 = pool[Math.floor(rand() * pool.length)];
+            let p2 = pool[Math.floor(rand() * pool.length)];
+            while(p1.id === p2.id) p2 = pool[Math.floor(rand() * pool.length)];
+            tempPairs.push({p1, p2});
+        }
+
+        // Fetch stats for all 9 matchups at the same time to create the difficulty curve
+        await Promise.all(tempPairs.map(async (pair) => {
+            pair.stat1 = await getStats(pair.p1.id);
+            pair.stat2 = await getStats(pair.p2.id);
+            pair.diff = Math.abs(pair.stat1 - pair.stat2);
+        }));
+
+        // Sort from easiest (biggest gap) to hardest (smallest gap)
+        tempPairs.sort((a, b) => b.diff - a.diff);
+        dailyPairs = tempPairs;
+
+        document.getElementById('loading-modal').style.display = 'none';
+
+        if (dailyState.over) {
+            showGameOver();
+        } else {
+            score = dailyState.inning; // Visual placeholder for UI
+            strikes = dailyState.strikes;
+            document.getElementById('score').innerText = `${dailyState.inning}/9`;
+            document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
+            nextRound();
         }
     }
 
@@ -396,6 +452,7 @@
         if (!checkPools()) return;
         busy = true;
         const mode = document.getElementById('game-mode').value;
+        const style = document.getElementById('play-style').value;
         
         const pool = (mode === 'homeRuns') ? homeRunPool : (mode === 'hits') ? hitsPool : strikeoutsPool;
         const labelText = (mode === 'homeRuns') ? 'Career Home Runs' : (mode === 'hits') ? 'Career Hits' : 'Career Strikeouts';
@@ -404,16 +461,26 @@
         document.querySelectorAll('.hr-reveal').forEach(el => el.style.visibility = 'hidden');
         document.querySelectorAll('.baseball-card').forEach(el => el.className = 'baseball-card');
 
-        const p1 = pool[Math.floor(Math.random() * pool.length)];
-        let p2 = pool[Math.floor(Math.random() * pool.length)];
-        while(p1.id === p2.id) p2 = pool[Math.floor(Math.random() * pool.length)];
+        let p1, p2, stat1, stat2;
 
-        let stat1 = await getStats(p1.id);
-        let stat2 = await getStats(p2.id);
-
-        while(stat1 === stat2) {
+        if (style === 'daily') {
+            // Pull from pre-calculated sorted array
+            let currentPair = dailyPairs[dailyState.inning - 1]; // 0-indexed
+            p1 = currentPair.p1;
+            p2 = currentPair.p2;
+            stat1 = currentPair.stat1;
+            stat2 = currentPair.stat2;
+        } else {
+            // Standard Random Unlimited
+            p1 = pool[Math.floor(Math.random() * pool.length)];
             p2 = pool[Math.floor(Math.random() * pool.length)];
-            if(p1.id !== p2.id) stat2 = await getStats(p2.id);
+            while(p1.id === p2.id) p2 = pool[Math.floor(Math.random() * pool.length)];
+            stat1 = await getStats(p1.id);
+            stat2 = await getStats(p2.id);
+            while(stat1 === stat2) {
+                p2 = pool[Math.floor(Math.random() * pool.length)];
+                if(p1.id !== p2.id) stat2 = await getStats(p2.id);
+            }
         }
 
         document.getElementById('name-left').innerText = p1.name;
@@ -422,11 +489,8 @@
         const imgLeft = document.getElementById('img-left');
         const imgRight = document.getElementById('img-right');
         
-        resetImageStyle(imgLeft);
-        resetImageStyle(imgRight);
-        
-        loadPlayerImage(imgLeft, p1.id, p1.name);
-        loadPlayerImage(imgRight, p2.id, p2.name);
+        resetImageStyle(imgLeft); resetImageStyle(imgRight);
+        loadPlayerImage(imgLeft, p1.id, p1.name); loadPlayerImage(imgRight, p2.id, p2.name);
 
         leftData = { ...p1, val: stat1 };
         rightData = { ...p2, val: stat2 };
@@ -437,7 +501,10 @@
         if(busy) return;
         busy = true;
         const mode = document.getElementById('game-mode').value;
-        const isCorrect = (side === 'left' && leftData.val > rightData.val) || (side === 'right' && rightData.val > leftData.val);
+        const style = document.getElementById('play-style').value;
+        
+        const isCorrect = (side === 'left' && leftData.val >= rightData.val) || (side === 'right' && rightData.val >= leftData.val);
+        
         document.getElementById('hr-left').innerText = leftData.val;
         document.getElementById('hr-right').innerText = rightData.val;
         document.querySelectorAll('.hr-reveal, .label-text').forEach(el => el.style.visibility = 'visible');
@@ -445,68 +512,131 @@
         const statusBar = document.getElementById('status-bar');
 
         if(isCorrect) {
-            score++;
             currentStreak++; 
-            document.getElementById('score').innerText = score;
+            if (style === 'daily') {
+                dailyState.history.push('🟩');
+                if(dailyState.inning < 9) { dailyState.inning++; } // Prevent going to 10
+                document.getElementById('score').innerText = `${dailyState.inning}/9`;
+            } else {
+                score++;
+                document.getElementById('score').innerText = score;
+            }
+            
             document.getElementById(`card-${side}`).classList.add('correct');
             
             if (!isMuted) {
                 const correctSound = (mode === 'strikeOuts') ? sfxPop : sfxCrack;
-                correctSound.currentTime = 0;
-                correctSound.play().catch(e => console.log("Audio play prevented"));
+                correctSound.currentTime = 0; correctSound.play().catch(e => console.log("Audio play prevented"));
             }
             
-            if (currentStreak >= 5) { 
+            if (currentStreak >= 5 && style === 'unlimited') { 
                 statusBar.classList.add('on-fire'); 
                 if (currentStreak === 5 && !isMuted) {
-                    sfxRoar.currentTime = 0;
-                    sfxRoar.play().catch(e => console.log("Audio play prevented"));
+                    sfxRoar.currentTime = 0; sfxRoar.play().catch(e => console.log("Audio play prevented"));
                 }
             }
         } else {
             strikes++;
             currentStreak = 0; 
+            
+            if (style === 'daily') {
+                dailyState.strikes++;
+                dailyState.history.push('🟥');
+            }
+            
             document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
             document.getElementById(`card-${side}`).classList.add('wrong');
             statusBar.classList.remove('on-fire'); 
 
             if (!isMuted) {
                 const wrongSound = (mode === 'strikeOuts') ? sfxCrack : sfxPop;
-                wrongSound.currentTime = 0;
-                wrongSound.play().catch(e => console.log("Audio play prevented"));
+                wrongSound.currentTime = 0; wrongSound.play().catch(e => console.log("Audio play prevented"));
             }
         }
 
-        setTimeout(() => {
-            if(strikes >= 3) {
-                let hsKey = getHighScoreKey();
-                let currentHS = parseInt(localStorage.getItem(hsKey)) || 0;
-                let newHsBadge = document.getElementById('new-hs-badge');
-                
-                if(score > currentHS && score > 0) {
-                    localStorage.setItem(hsKey, score);
-                    updateHighScoreDisplay();
-                    newHsBadge.style.display = 'block'; 
-                    
-                    if (!isMuted) {
-                        sfxCheer.currentTime = 0;
-                        sfxCheer.play().catch(e => console.log("Audio play prevented"));
-                    }
-                } else {
-                    newHsBadge.style.display = 'none'; 
-                }
+        // SAVE DAILY STATE
+        if (style === 'daily') {
+            localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
+        }
 
-                statusBar.classList.remove('on-fire');
-                document.getElementById('final-score-display').innerText = "SCORE: " + score;
-                document.getElementById('game-over-modal').style.display = 'flex';
-            } else { nextRound(); }
+        setTimeout(() => {
+            if (style === 'daily') {
+                if (dailyState.strikes >= 3) {
+                    dailyState.over = true; dailyState.won = false;
+                    localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
+                    showGameOver();
+                } else if (isCorrect && dailyState.history.length === 9) {
+                    // Won the 9th inning!
+                    dailyState.over = true; dailyState.won = true;
+                    localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
+                    
+                    if (!isMuted) { sfxCheer.currentTime = 0; sfxCheer.play().catch(e=>console.log("Audio prevented")); }
+                    showGameOver();
+                } else {
+                    nextRound();
+                }
+            } else {
+                // Unlimited Mode Logic
+                if(strikes >= 3) {
+                    let hsKey = getHighScoreKey();
+                    let currentHS = parseInt(localStorage.getItem(hsKey)) || 0;
+                    let newHsBadge = document.getElementById('new-hs-badge');
+                    
+                    if(score > currentHS && score > 0) {
+                        localStorage.setItem(hsKey, score);
+                        updateHighScoreDisplay();
+                        newHsBadge.style.display = 'block'; 
+                        if (!isMuted) { sfxCheer.currentTime = 0; sfxCheer.play().catch(e=>console.log("Audio prevented")); }
+                    } else { newHsBadge.style.display = 'none'; }
+                    showGameOver();
+                } else { nextRound(); }
+            }
         }, 1800);
+    }
+
+    function showGameOver() {
+        const style = document.getElementById('play-style').value;
+        const modal = document.getElementById('game-over-modal');
+        const title = document.getElementById('game-over-title');
+        const display = document.getElementById('final-score-display');
+        const btn = document.getElementById('play-again-btn');
+
+        document.getElementById('status-bar').classList.remove('on-fire');
+
+        if (style === 'daily') {
+            if (dailyState.won) {
+                title.innerText = "YOU WIN!";
+                title.style.color = "var(--success-green)";
+                display.innerText = "Completed all 9 Innings!";
+            } else {
+                title.innerText = "YOU'RE OUT!";
+                title.style.color = "var(--header-bg)";
+                display.innerText = `Struck out in Inning ${dailyState.inning}`;
+            }
+            btn.innerText = "PLAY UNLIMITED MODE";
+        } else {
+            title.innerText = "YOU'RE OUT!";
+            title.style.color = "var(--header-bg)";
+            display.innerText = "SCORE: " + score;
+            btn.innerText = "PLAY AGAIN";
+        }
+        
+        modal.style.display = 'flex';
     }
 
     function share(platform) {
         const modeSel = document.getElementById('game-mode');
         const modeName = modeSel.options[modeSel.selectedIndex].text;
-        const text = `⚾ I hit a score of ${score} on ${modeName} in 'The Diamond Duel'! Can you beat my high score? Play here: ${window.location.href}`;
+        const style = document.getElementById('play-style').value;
+        
+        let text = "";
+        
+        if (style === 'daily') {
+            const resultText = dailyState.won ? "beat" : "struck out on";
+            text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's 9-Inning game!\n\n${dailyState.history.join("")}\n\nPlay here: ${window.location.href}`;
+        } else {
+            text = `⚾ I hit a score of ${score} on Unlimited ${modeName} in 'The Diamond Duel'! Can you beat my high score? Play here: ${window.location.href}`;
+        }
         
         if (platform === 'copy' || platform === 'ig') {
             navigator.clipboard.writeText(text);
@@ -519,12 +649,22 @@
         }
     }
 
-    function handleModeSwitch() {
-        resetGame();
-        toggleInstructions(true); 
+    async function handleModeSwitch() {
+        // Only run Daily load if Daily is explicitly active
+        if (document.getElementById('play-style').value === 'daily') {
+            updateTheme();
+            await initDailyMode();
+        } else {
+            resetGame();
+        }
     }
 
     function resetGame() {
+        // If clicking Play Again from daily loss, force switch to unlimited
+        if (document.getElementById('play-style').value === 'daily' && document.getElementById('game-over-modal').style.display === 'flex') {
+            document.getElementById('play-style').value = 'unlimited';
+        }
+
         score = 0; strikes = 0; currentStreak = 0; 
         document.getElementById('score').innerText = "0";
         document.getElementById('strikes').innerText = "⚪⚪⚪";
@@ -532,11 +672,15 @@
         document.getElementById('new-hs-badge').style.display = 'none'; 
         document.getElementById('status-bar').classList.remove('on-fire'); 
         updateTheme(); 
-        nextRound();
+        
+        if (document.getElementById('play-style').value === 'unlimited') {
+            nextRound();
+        }
     }
 
     function toggleInstructions(show) { document.getElementById('instructions-modal').style.display = show ? 'flex' : 'none'; }
 
+    // INITIAL START
     updateTheme(); 
     nextRound();
 </script>
