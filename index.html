@@ -159,10 +159,16 @@
         .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* The Wordle Grid Display on Game Over */
+        /* THE NEW VISUAL WORDLE GRID */
         #daily-grid-display {
-            font-size: 1.6rem; letter-spacing: 3px; margin: 15px 0; display: none; text-align: center;
+            display: none; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 15px auto; max-width: 320px;
         }
+        .wordle-square {
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 0.85rem; color: white; border-radius: 6px;
+        }
+        .wordle-square.correct { background-color: var(--success-green); box-shadow: 0 3px 0 #1e7e34; }
+        .wordle-square.wrong { background-color: #d32f2f; box-shadow: 0 3px 0 #9a1e1e; }
 
         @media (max-width: 600px) { 
             h1 { font-size: 1.8rem; } 
@@ -176,7 +182,6 @@
 
 <header>
     <div class="dropdown-container">
-        <!-- NEW: Daily Mode is now the default option at the top of the dropdown -->
         <select id="play-style" class="style-select" onchange="handleModeSwitch()">
             <option value="daily">Daily 9-Inning Mode</option>
             <option value="unlimited">Unlimited Mode</option>
@@ -243,6 +248,7 @@
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
+        <!-- The Visual Square Grid -->
         <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
@@ -274,6 +280,13 @@
     const sfxRoar = new Audio('roar.mp3');
     const sfxCheer = new Audio('cheer.mp3'); 
     sfxCrack.volume = 0.6; sfxPop.volume = 0.5; sfxRoar.volume = 0.4; sfxCheer.volume = 0.6; 
+
+    // ORDINAL NUMBER HELPER (1st, 2nd, 3rd, 4th, etc.)
+    function getOrdinal(n) {
+        let s = ["th", "st", "nd", "rd"];
+        let v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
 
     function cyrb128(str) {
         let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
@@ -638,8 +651,22 @@
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
-            gridDisplay.style.display = 'block';
-            gridDisplay.innerText = dailyState.history.join('');
+            // RENDER THE VISUAL GRID SQUARES WITH INNING LABELS
+            gridDisplay.style.display = 'flex';
+            gridDisplay.innerHTML = ''; 
+            
+            let currentInningLabel = 1;
+            for (let i = 0; i < dailyState.history.length; i++) {
+                let res = dailyState.history[i];
+                let square = document.createElement('div');
+                square.className = 'wordle-square ' + (res === '🟩' ? 'correct' : 'wrong');
+                square.innerText = getOrdinal(currentInningLabel);
+                gridDisplay.appendChild(square);
+                
+                if (res === '🟩') {
+                    currentInningLabel++;
+                }
+            }
 
             if (dailyState.won) {
                 title.innerText = "YOU WIN!";
@@ -648,7 +675,8 @@
             } else {
                 title.innerText = "3 STRIKES, YOU'RE OUT!";
                 title.style.color = "var(--header-bg)";
-                display.innerText = `You made it to Inning ${dailyState.inning}!`;
+                // GRAMMAR FIX: "the 4th inning!"
+                display.innerText = `You made it to the ${getOrdinal(dailyState.inning)} inning!`;
             }
             btn.innerText = "PLAY UNLIMITED MODE";
         } else {
@@ -670,8 +698,31 @@
         let text = "";
         
         if (style === 'daily') {
-            const resultText = dailyState.won ? "beat" : `struck out in Inning ${dailyState.inning} of`;
-            text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's game!\n\n${dailyState.history.join("")}\n\nPlay here: ${window.location.href}`;
+            // BUILD THE SOCIAL SHARE TEXT (Line by line, sorted by inning)
+            let shareLines = [];
+            let curInn = 1;
+            let currentLine = getOrdinal(curInn) + ": ";
+            
+            for (let i = 0; i < dailyState.history.length; i++) {
+                let res = dailyState.history[i];
+                currentLine += res;
+                if (res === '🟩') {
+                    shareLines.push(currentLine);
+                    curInn++;
+                    if (curInn <= 9 && i < dailyState.history.length - 1) {
+                        currentLine = getOrdinal(curInn) + ": ";
+                    } else {
+                        currentLine = "";
+                    }
+                }
+            }
+            // Catch any lingering strikes if they struck out on the final round
+            if (currentLine !== "") { shareLines.push(currentLine); }
+            
+            const gridText = shareLines.join('\n');
+            const resultText = dailyState.won ? "beat" : `struck out in the ${getOrdinal(dailyState.inning)} inning of`;
+            
+            text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's game!\n\n${gridText}\n\nPlay here: ${window.location.href}`;
         } else {
             text = `⚾ I hit a score of ${score} on Unlimited ${modeName} in 'The Diamond Duel'! Can you beat my high score? Play here: ${window.location.href}`;
         }
@@ -727,7 +778,7 @@
 
     function toggleInstructions(show) { document.getElementById('instructions-modal').style.display = show ? 'flex' : 'none'; }
 
-    // NEW LOGIC: Daily is the default, trigger handleModeSwitch immediately
+    // Start App Default
     document.getElementById('play-style').value = 'daily';
     handleModeSwitch(); 
 
