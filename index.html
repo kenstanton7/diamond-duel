@@ -242,6 +242,7 @@
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
+        <!-- The Wordle Grid -->
         <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
@@ -261,7 +262,8 @@
 <script>
     let leftData, rightData, score = 0, strikes = 0, currentStreak = 0, busy = false;
     let isMuted = false;
-    let roundTimeout; // Solves the mode-switch glitch
+    let roundTimeout; 
+    let currentRoundToken = 0; // Fixes the mode switching collision glitch
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
@@ -320,11 +322,15 @@
     }
 
     async function getStats(id) {
-        const mode = document.getElementById('game-mode').value;
-        const statGroup = (mode === 'strikeOuts') ? 'pitching' : 'hitting';
-        const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=career&group=${statGroup}`);
-        const j = await r.json();
-        return j.stats[0]?.splits[0]?.stat[mode] || 0;
+        try {
+            const mode = document.getElementById('game-mode').value;
+            const statGroup = (mode === 'strikeOuts') ? 'pitching' : 'hitting';
+            const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=career&group=${statGroup}`);
+            const j = await r.json();
+            return j.stats[0]?.splits[0]?.stat[mode] || 0;
+        } catch(e) {
+            return 0; // Prevents API glitches from crashing the game
+        }
     }
 
     function updateTheme() {
@@ -407,6 +413,7 @@
     }
 
     async function initDailyMode() {
+        const token = ++currentRoundToken; // Secure against rapid switching
         document.getElementById('loading-modal').style.display = 'flex';
         const mode = document.getElementById('game-mode').value;
         const dailyKey = getDailyKey();
@@ -414,7 +421,7 @@
         let saved = localStorage.getItem(dailyKey);
         if (saved) {
             dailyState = JSON.parse(saved);
-            if (dailyState.foul === undefined) dailyState.foul = false; // Backwards compatibility
+            if (dailyState.foul === undefined) dailyState.foul = false; 
         } else {
             dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false, foul: false };
         }
@@ -425,7 +432,6 @@
         const pool = (mode === 'homeRuns') ? homeRunPool : (mode === 'hits') ? hitsPool : strikeoutsPool;
 
         let tempPairs = [];
-        // Only 9 pairs generated, you always play 9 innings! 
         for(let i=0; i<9; i++) {
             let p1 = pool[Math.floor(rand() * pool.length)];
             let p2 = pool[Math.floor(rand() * pool.length)];
@@ -434,10 +440,24 @@
         }
 
         await Promise.all(tempPairs.map(async (pair) => {
-            pair.stat1 = await getStats(pair.p1.id);
-            pair.stat2 = await getStats(pair.p2.id);
-            pair.diff = Math.abs(pair.stat1 - pair.stat2);
+            try {
+                pair.stat1 = await getStats(pair.p1.id);
+                pair.stat2 = await getStats(pair.p2.id);
+                
+                // Prevent duplicate ties in Daily Mode
+                let tieBreaker = 0;
+                while (pair.stat1 === pair.stat2 && tieBreaker < 5) {
+                    pair.p2 = pool[Math.floor(rand() * pool.length)];
+                    if (pair.p1.id !== pair.p2.id) { pair.stat2 = await getStats(pair.p2.id); }
+                    tieBreaker++;
+                }
+                pair.diff = Math.abs(pair.stat1 - pair.stat2);
+            } catch (e) {
+                pair.diff = -1; // Fallback
+            }
         }));
+
+        if (token !== currentRoundToken) return; // Silent abort if mode was changed during load!
 
         tempPairs.sort((a, b) => b.diff - a.diff);
         dailyPairs = tempPairs;
@@ -454,6 +474,7 @@
     }
 
     async function nextRound() {
+        const token = ++currentRoundToken; // Secure against rapid switching
         if (!checkPools()) return;
         busy = true;
         const mode = document.getElementById('game-mode').value;
@@ -464,19 +485,13 @@
         
         document.querySelectorAll('.label-text').forEach(el => { el.innerText = labelText; el.style.visibility = 'hidden'; });
         document.querySelectorAll('.hr-reveal').forEach(el => el.style.visibility = 'hidden');
-        document.querySelectorAll('.baseball-card').forEach(el => {
-            el.className = 'baseball-card'; // Clears all correct/wrong borders
-        });
+        document.querySelectorAll('.baseball-card').forEach(el => { el.className = 'baseball-card'; });
 
         let p1, p2, stat1, stat2;
 
         if (style === 'daily') {
-            // Read from the 9 sorted pairs based on the inning
             let currentPair = dailyPairs[dailyState.pairIndex]; 
-            p1 = currentPair.p1;
-            p2 = currentPair.p2;
-            stat1 = currentPair.stat1;
-            stat2 = currentPair.stat2;
+            p1 = currentPair.p1; p2 = currentPair.p2; stat1 = currentPair.stat1; stat2 = currentPair.stat2;
         } else {
             p1 = pool[Math.floor(Math.random() * pool.length)];
             p2 = pool[Math.floor(Math.random() * pool.length)];
@@ -488,6 +503,8 @@
                 if(p1.id !== p2.id) stat2 = await getStats(p2.id);
             }
         }
+
+        if (token !== currentRoundToken) return; // Silent abort if mode was changed during load!
 
         document.getElementById('name-left').innerText = p1.name;
         document.getElementById('name-right').innerText = p2.name;
@@ -506,7 +523,7 @@
     function makeGuess(side) {
         if(busy) return;
         
-        // Prevent clicking the card that was already marked wrong in Daily mode!
+        // Block clicking the card that was already proven wrong
         if (document.getElementById(`card-${side}`).classList.contains('wrong')) return; 
         
         busy = true;
@@ -524,14 +541,11 @@
         if(isCorrect) {
             currentStreak++; 
             if (style === 'daily') {
-                // If they previously got a strike on this inning, log red. Otherwise, green!
-                if (dailyState.foul) {
-                    dailyState.history.push('🟥');
-                } else {
-                    dailyState.history.push('🟩');
-                }
+                if (dailyState.foul) { dailyState.history.push('🟥'); } 
+                else { dailyState.history.push('🟩'); }
+                
                 dailyState.foul = false; // Reset the foul for the next inning
-                dailyState.inning++; // Advance to the next inning!
+                dailyState.inning++; // Advance to the next inning
                 dailyState.pairIndex++; 
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
@@ -553,7 +567,6 @@
                 }
             }
         } else {
-            strikes++;
             currentStreak = 0; 
             
             if (style === 'daily') {
@@ -562,9 +575,12 @@
                 if (dailyState.strikes >= 3) {
                     dailyState.history.push('🟥'); // Cap off history with the final fatal strike
                 }
+                document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
+            } else {
+                strikes++;
+                document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
             }
             
-            document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
             document.getElementById(`card-${side}`).classList.add('wrong');
             statusBar.classList.remove('on-fire'); 
 
@@ -574,19 +590,18 @@
             }
         }
 
-        // SAVE STATE
+        // SAVE STATE TO BROWSER
         if (style === 'daily') {
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
 
-        // 1.8 SECOND TIMEOUT LOGIC
         roundTimeout = setTimeout(() => {
             if (style === 'daily') {
                 if (dailyState.strikes >= 3) {
                     dailyState.over = true; dailyState.won = false;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     showGameOver();
-                } else if (isCorrect && dailyState.inning > 9) { // Won the 9th inning!
+                } else if (isCorrect && dailyState.inning > 9) {
                     dailyState.over = true; dailyState.won = true;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     
@@ -595,12 +610,10 @@
                 } else if (isCorrect) {
                     nextRound();
                 } else {
-                    // NEW: If they got it wrong but haven't struck out, just unlock the board!
-                    // This lets them click the correct player without advancing the inning.
+                    // unlocks the board so they can pick the right answer!
                     busy = false;
                 }
             } else {
-                // Unlimited Mode Logic
                 if(strikes >= 3) {
                     let hsKey = getHighScoreKey();
                     let currentHS = parseInt(localStorage.getItem(hsKey)) || 0;
@@ -629,7 +642,6 @@
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
-            // UN-HIDE THE EMOJI GRID
             gridDisplay.style.display = 'block';
             gridDisplay.innerText = dailyState.history.join('');
 
@@ -680,9 +692,11 @@
     }
 
     async function handleModeSwitch() {
-        // FIX: Clear any pending round timers and instantly unlock the board
         clearTimeout(roundTimeout);
-        busy = false;
+        busy = false; 
+        currentRoundToken++; // Kills any pending fetches immediately!
+
+        document.getElementById('loading-modal').style.display = 'none';
 
         if (document.getElementById('play-style').value === 'daily') {
             updateTheme();
@@ -697,9 +711,9 @@
             document.getElementById('play-style').value = 'unlimited';
         }
 
-        // FIX: Ensure UI resets clean
         clearTimeout(roundTimeout);
         busy = false;
+        currentRoundToken++; // Kills any pending fetches immediately!
         
         score = 0; strikes = 0; currentStreak = 0; 
         document.getElementById('score').innerText = "0";
