@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Diamond Duel: Stat Showdown</title>
+    <title>The Diamond Duel: Home Run Showdown</title>
     <style>
         :root { 
             --off-white: #fdfaf0; 
@@ -160,6 +160,11 @@
         .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* NEW: Wordle Grid Display */
+        #daily-grid-display {
+            font-size: 1.6rem; letter-spacing: 3px; margin: 15px 0; display: none; text-align: center;
+        }
+
         @media (max-width: 600px) { 
             h1 { font-size: 1.8rem; } 
             .dropdown-container { position: relative; left: 0; transform: none; margin-bottom: 5px; top: 0; align-items: center; flex-direction: row; justify-content: center; }
@@ -225,7 +230,6 @@
     </div>
 </div>
 
-<!-- NEW LOADING MODAL FOR DAILY MODE -->
 <div id="loading-modal" class="modal">
     <div class="modal-content">
         <h2 style="font-family: 'Impact'; color: var(--header-bg); font-size: 2rem; margin-top:0;">PREPPING THE FIELD</h2>
@@ -238,6 +242,9 @@
     <div class="modal-content">
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
+        
+        <!-- NEW: The Emoji Grid Display -->
+        <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
         
@@ -259,16 +266,15 @@
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
-    let dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+    // NEW LOGIC: We now track the inning (1-9) separately from the pairIndex (0-11)
+    let dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false };
 
-    // AUDIO SETUP 
     const sfxCrack = new Audio('crack.mp3');
     const sfxPop = new Audio('pop.mp3');
     const sfxRoar = new Audio('roar.mp3');
     const sfxCheer = new Audio('cheer.mp3'); 
     sfxCrack.volume = 0.6; sfxPop.volume = 0.5; sfxRoar.volume = 0.4; sfxCheer.volume = 0.6; 
 
-    // --- MATH LOGIC FOR SEEDED DAILY RANDOMIZER ---
     function cyrb128(str) {
         let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
         for (let i = 0, k; i < str.length; i++) {
@@ -335,13 +341,16 @@
         if (mode === 'hits') {
             body.classList.add('mode-hits');
             document.getElementById('sub-title').innerText = "HIT SHOWDOWN";
+            document.title = "The Diamond Duel: Hit Showdown";
             modeDesc = "<strong>most career hits</strong>.<br><br>This mode features players with <strong>at least 300 hits</strong>.";
         } else if (mode === 'strikeOuts') {
             body.classList.add('mode-strikeOuts');
             document.getElementById('sub-title').innerText = "STRIKEOUT SHOWDOWN";
+            document.title = "The Diamond Duel: Strikeout Showdown";
             modeDesc = "<strong>most career strikeouts</strong>.<br><br>This mode features pitchers with <strong>at least 500 strikeouts</strong>.";
         } else {
             document.getElementById('sub-title').innerText = "HOME RUN SHOWDOWN";
+            document.title = "The Diamond Duel: Home Run Showdown";
             modeDesc = "<strong>most career home runs</strong>.<br><br>This mode features players with <strong>at least 50 home runs</strong>.";
         }
         
@@ -408,7 +417,8 @@
         if (saved) {
             dailyState = JSON.parse(saved);
         } else {
-            dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+            // Start fresh! Inning 1, looking at the 0th pair in the array.
+            dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false };
         }
 
         const seedStr = dailyKey;
@@ -417,21 +427,20 @@
         const pool = (mode === 'homeRuns') ? homeRunPool : (mode === 'hits') ? hitsPool : strikeoutsPool;
 
         let tempPairs = [];
-        for(let i=0; i<9; i++) {
+        // Generate 12 pairs instead of 9, giving room for strikes without running out of matchups!
+        for(let i=0; i<12; i++) {
             let p1 = pool[Math.floor(rand() * pool.length)];
             let p2 = pool[Math.floor(rand() * pool.length)];
             while(p1.id === p2.id) p2 = pool[Math.floor(rand() * pool.length)];
             tempPairs.push({p1, p2});
         }
 
-        // Fetch stats for all 9 matchups at the same time to create the difficulty curve
         await Promise.all(tempPairs.map(async (pair) => {
             pair.stat1 = await getStats(pair.p1.id);
             pair.stat2 = await getStats(pair.p2.id);
             pair.diff = Math.abs(pair.stat1 - pair.stat2);
         }));
 
-        // Sort from easiest (biggest gap) to hardest (smallest gap)
         tempPairs.sort((a, b) => b.diff - a.diff);
         dailyPairs = tempPairs;
 
@@ -440,10 +449,9 @@
         if (dailyState.over) {
             showGameOver();
         } else {
-            score = dailyState.inning; // Visual placeholder for UI
-            strikes = dailyState.strikes;
-            document.getElementById('score').innerText = `${dailyState.inning}/9`;
-            document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
+            // Visual logic so it doesn't say "Inning 10/9" when they win.
+            document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
+            document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
             nextRound();
         }
     }
@@ -464,14 +472,13 @@
         let p1, p2, stat1, stat2;
 
         if (style === 'daily') {
-            // Pull from pre-calculated sorted array
-            let currentPair = dailyPairs[dailyState.inning - 1]; // 0-indexed
+            // Use the separate pairIndex to grab the next batter up
+            let currentPair = dailyPairs[dailyState.pairIndex]; 
             p1 = currentPair.p1;
             p2 = currentPair.p2;
             stat1 = currentPair.stat1;
             stat2 = currentPair.stat2;
         } else {
-            // Standard Random Unlimited
             p1 = pool[Math.floor(Math.random() * pool.length)];
             p2 = pool[Math.floor(Math.random() * pool.length)];
             while(p1.id === p2.id) p2 = pool[Math.floor(Math.random() * pool.length)];
@@ -515,8 +522,9 @@
             currentStreak++; 
             if (style === 'daily') {
                 dailyState.history.push('🟩');
-                if(dailyState.inning < 9) { dailyState.inning++; } // Prevent going to 10
-                document.getElementById('score').innerText = `${dailyState.inning}/9`;
+                dailyState.inning++; // Advance the inning!
+                dailyState.pairIndex++; // Burn the pair
+                document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
                 score++;
                 document.getElementById('score').innerText = score;
@@ -542,6 +550,7 @@
             if (style === 'daily') {
                 dailyState.strikes++;
                 dailyState.history.push('🟥');
+                dailyState.pairIndex++; // Burn the pair, but the inning stays the same!
             }
             
             document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
@@ -554,7 +563,7 @@
             }
         }
 
-        // SAVE DAILY STATE
+        // SAVE DAILY STATE TO THE BROWSER
         if (style === 'daily') {
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
@@ -565,8 +574,7 @@
                     dailyState.over = true; dailyState.won = false;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     showGameOver();
-                } else if (isCorrect && dailyState.history.length === 9) {
-                    // Won the 9th inning!
+                } else if (dailyState.inning > 9) { // Won the 9th inning!
                     dailyState.over = true; dailyState.won = true;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     
@@ -600,21 +608,27 @@
         const title = document.getElementById('game-over-title');
         const display = document.getElementById('final-score-display');
         const btn = document.getElementById('play-again-btn');
+        const gridDisplay = document.getElementById('daily-grid-display');
 
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
+            // Un-hide the emoji grid so they can see their results
+            gridDisplay.style.display = 'block';
+            gridDisplay.innerText = dailyState.history.join('');
+
             if (dailyState.won) {
                 title.innerText = "YOU WIN!";
                 title.style.color = "var(--success-green)";
                 display.innerText = "Completed all 9 Innings!";
             } else {
-                title.innerText = "YOU'RE OUT!";
+                title.innerText = "3 STRIKES, YOU'RE OUT!";
                 title.style.color = "var(--header-bg)";
-                display.innerText = `Struck out in Inning ${dailyState.inning}`;
+                display.innerText = `You made it to Inning ${dailyState.inning}!`;
             }
             btn.innerText = "PLAY UNLIMITED MODE";
         } else {
+            gridDisplay.style.display = 'none';
             title.innerText = "YOU'RE OUT!";
             title.style.color = "var(--header-bg)";
             display.innerText = "SCORE: " + score;
@@ -632,8 +646,9 @@
         let text = "";
         
         if (style === 'daily') {
-            const resultText = dailyState.won ? "beat" : "struck out on";
-            text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's 9-Inning game!\n\n${dailyState.history.join("")}\n\nPlay here: ${window.location.href}`;
+            // Generate clean text showing off the emojis
+            const resultText = dailyState.won ? "beat" : `struck out in Inning ${dailyState.inning} of`;
+            text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's game!\n\n${dailyState.history.join("")}\n\nPlay here: ${window.location.href}`;
         } else {
             text = `⚾ I hit a score of ${score} on Unlimited ${modeName} in 'The Diamond Duel'! Can you beat my high score? Play here: ${window.location.href}`;
         }
@@ -650,7 +665,6 @@
     }
 
     async function handleModeSwitch() {
-        // Only run Daily load if Daily is explicitly active
         if (document.getElementById('play-style').value === 'daily') {
             updateTheme();
             await initDailyMode();
@@ -660,7 +674,6 @@
     }
 
     function resetGame() {
-        // If clicking Play Again from daily loss, force switch to unlimited
         if (document.getElementById('play-style').value === 'daily' && document.getElementById('game-over-modal').style.display === 'flex') {
             document.getElementById('play-style').value = 'unlimited';
         }
@@ -670,6 +683,7 @@
         document.getElementById('strikes').innerText = "⚪⚪⚪";
         document.getElementById('game-over-modal').style.display = 'none';
         document.getElementById('new-hs-badge').style.display = 'none'; 
+        document.getElementById('daily-grid-display').style.display = 'none';
         document.getElementById('status-bar').classList.remove('on-fire'); 
         updateTheme(); 
         
@@ -680,7 +694,6 @@
 
     function toggleInstructions(show) { document.getElementById('instructions-modal').style.display = show ? 'flex' : 'none'; }
 
-    // INITIAL START
     updateTheme(); 
     nextRound();
 </script>
