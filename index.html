@@ -176,9 +176,10 @@
 
 <header>
     <div class="dropdown-container">
+        <!-- NEW: Daily Mode is now the default option at the top of the dropdown -->
         <select id="play-style" class="style-select" onchange="handleModeSwitch()">
-            <option value="unlimited">Unlimited Mode</option>
             <option value="daily">Daily 9-Inning Mode</option>
+            <option value="unlimited">Unlimited Mode</option>
         </select>
         <select id="game-mode" class="mode-select" onchange="handleModeSwitch()">
             <option value="homeRuns">Home Run Mode</option>
@@ -242,7 +243,6 @@
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
-        <!-- The Wordle Grid -->
         <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
@@ -263,7 +263,7 @@
     let leftData, rightData, score = 0, strikes = 0, currentStreak = 0, busy = false;
     let isMuted = false;
     let roundTimeout; 
-    let currentRoundToken = 0; // Fixes the mode switching collision glitch
+    let currentRoundToken = 0; 
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
@@ -329,7 +329,7 @@
             const j = await r.json();
             return j.stats[0]?.splits[0]?.stat[mode] || 0;
         } catch(e) {
-            return 0; // Prevents API glitches from crashing the game
+            return 0; 
         }
     }
 
@@ -413,7 +413,7 @@
     }
 
     async function initDailyMode() {
-        const token = ++currentRoundToken; // Secure against rapid switching
+        const token = ++currentRoundToken; 
         document.getElementById('loading-modal').style.display = 'flex';
         const mode = document.getElementById('game-mode').value;
         const dailyKey = getDailyKey();
@@ -444,7 +444,6 @@
                 pair.stat1 = await getStats(pair.p1.id);
                 pair.stat2 = await getStats(pair.p2.id);
                 
-                // Prevent duplicate ties in Daily Mode
                 let tieBreaker = 0;
                 while (pair.stat1 === pair.stat2 && tieBreaker < 5) {
                     pair.p2 = pool[Math.floor(rand() * pool.length)];
@@ -453,11 +452,11 @@
                 }
                 pair.diff = Math.abs(pair.stat1 - pair.stat2);
             } catch (e) {
-                pair.diff = -1; // Fallback
+                pair.diff = -1; 
             }
         }));
 
-        if (token !== currentRoundToken) return; // Silent abort if mode was changed during load!
+        if (token !== currentRoundToken) return; 
 
         tempPairs.sort((a, b) => b.diff - a.diff);
         dailyPairs = tempPairs;
@@ -474,7 +473,7 @@
     }
 
     async function nextRound() {
-        const token = ++currentRoundToken; // Secure against rapid switching
+        const token = ++currentRoundToken; 
         if (!checkPools()) return;
         busy = true;
         const mode = document.getElementById('game-mode').value;
@@ -504,7 +503,7 @@
             }
         }
 
-        if (token !== currentRoundToken) return; // Silent abort if mode was changed during load!
+        if (token !== currentRoundToken) return; 
 
         document.getElementById('name-left').innerText = p1.name;
         document.getElementById('name-right').innerText = p2.name;
@@ -523,7 +522,6 @@
     function makeGuess(side) {
         if(busy) return;
         
-        // Block clicking the card that was already proven wrong
         if (document.getElementById(`card-${side}`).classList.contains('wrong')) return; 
         
         busy = true;
@@ -544,8 +542,8 @@
                 if (dailyState.foul) { dailyState.history.push('🟥'); } 
                 else { dailyState.history.push('🟩'); }
                 
-                dailyState.foul = false; // Reset the foul for the next inning
-                dailyState.inning++; // Advance to the next inning
+                dailyState.foul = false; 
+                dailyState.inning++; 
                 dailyState.pairIndex++; 
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
@@ -571,9 +569,9 @@
             
             if (style === 'daily') {
                 dailyState.strikes++;
-                dailyState.foul = true; // Mark the inning as fouled, but do NOT increment the inning
+                dailyState.foul = true; 
                 if (dailyState.strikes >= 3) {
-                    dailyState.history.push('🟥'); // Cap off history with the final fatal strike
+                    dailyState.history.push('🟥'); 
                 }
                 document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
             } else {
@@ -590,7 +588,6 @@
             }
         }
 
-        // SAVE STATE TO BROWSER
         if (style === 'daily') {
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
@@ -610,7 +607,6 @@
                 } else if (isCorrect) {
                     nextRound();
                 } else {
-                    // unlocks the board so they can pick the right answer!
                     busy = false;
                 }
             } else {
@@ -694,7 +690,7 @@
     async function handleModeSwitch() {
         clearTimeout(roundTimeout);
         busy = false; 
-        currentRoundToken++; // Kills any pending fetches immediately!
+        currentRoundToken++; 
 
         document.getElementById('loading-modal').style.display = 'none';
 
@@ -713,7 +709,7 @@
 
         clearTimeout(roundTimeout);
         busy = false;
-        currentRoundToken++; // Kills any pending fetches immediately!
+        currentRoundToken++; 
         
         score = 0; strikes = 0; currentStreak = 0; 
         document.getElementById('score').innerText = "0";
@@ -731,8 +727,10 @@
 
     function toggleInstructions(show) { document.getElementById('instructions-modal').style.display = show ? 'flex' : 'none'; }
 
-    updateTheme(); 
-    nextRound();
+    // NEW LOGIC: Daily is the default, trigger handleModeSwitch immediately
+    document.getElementById('play-style').value = 'daily';
+    handleModeSwitch(); 
+
 </script>
 </body>
 </html>
