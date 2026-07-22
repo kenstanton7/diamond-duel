@@ -156,11 +156,10 @@
         .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; width: 100%; }
         .btn-social { color: white; font-size: 0.8rem; padding: 10px; }
 
-        /* LOADING SPINNER */
         .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* NEW: Wordle Grid Display */
+        /* The Wordle Grid Display on Game Over */
         #daily-grid-display {
             font-size: 1.6rem; letter-spacing: 3px; margin: 15px 0; display: none; text-align: center;
         }
@@ -243,7 +242,6 @@
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
-        <!-- NEW: The Emoji Grid Display -->
         <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
@@ -263,11 +261,11 @@
 <script>
     let leftData, rightData, score = 0, strikes = 0, currentStreak = 0, busy = false;
     let isMuted = false;
+    let roundTimeout; // Solves the mode-switch glitch
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
-    // NEW LOGIC: We now track the inning (1-9) separately from the pairIndex (0-11)
-    let dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false };
+    let dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false, foul: false };
 
     const sfxCrack = new Audio('crack.mp3');
     const sfxPop = new Audio('pop.mp3');
@@ -416,9 +414,9 @@
         let saved = localStorage.getItem(dailyKey);
         if (saved) {
             dailyState = JSON.parse(saved);
+            if (dailyState.foul === undefined) dailyState.foul = false; // Backwards compatibility
         } else {
-            // Start fresh! Inning 1, looking at the 0th pair in the array.
-            dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false };
+            dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false, foul: false };
         }
 
         const seedStr = dailyKey;
@@ -427,8 +425,8 @@
         const pool = (mode === 'homeRuns') ? homeRunPool : (mode === 'hits') ? hitsPool : strikeoutsPool;
 
         let tempPairs = [];
-        // Generate 12 pairs instead of 9, giving room for strikes without running out of matchups!
-        for(let i=0; i<12; i++) {
+        // Only 9 pairs generated, you always play 9 innings! 
+        for(let i=0; i<9; i++) {
             let p1 = pool[Math.floor(rand() * pool.length)];
             let p2 = pool[Math.floor(rand() * pool.length)];
             while(p1.id === p2.id) p2 = pool[Math.floor(rand() * pool.length)];
@@ -449,7 +447,6 @@
         if (dailyState.over) {
             showGameOver();
         } else {
-            // Visual logic so it doesn't say "Inning 10/9" when they win.
             document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
             nextRound();
@@ -467,12 +464,14 @@
         
         document.querySelectorAll('.label-text').forEach(el => { el.innerText = labelText; el.style.visibility = 'hidden'; });
         document.querySelectorAll('.hr-reveal').forEach(el => el.style.visibility = 'hidden');
-        document.querySelectorAll('.baseball-card').forEach(el => el.className = 'baseball-card');
+        document.querySelectorAll('.baseball-card').forEach(el => {
+            el.className = 'baseball-card'; // Clears all correct/wrong borders
+        });
 
         let p1, p2, stat1, stat2;
 
         if (style === 'daily') {
-            // Use the separate pairIndex to grab the next batter up
+            // Read from the 9 sorted pairs based on the inning
             let currentPair = dailyPairs[dailyState.pairIndex]; 
             p1 = currentPair.p1;
             p2 = currentPair.p2;
@@ -506,6 +505,10 @@
 
     function makeGuess(side) {
         if(busy) return;
+        
+        // Prevent clicking the card that was already marked wrong in Daily mode!
+        if (document.getElementById(`card-${side}`).classList.contains('wrong')) return; 
+        
         busy = true;
         const mode = document.getElementById('game-mode').value;
         const style = document.getElementById('play-style').value;
@@ -521,9 +524,15 @@
         if(isCorrect) {
             currentStreak++; 
             if (style === 'daily') {
-                dailyState.history.push('🟩');
-                dailyState.inning++; // Advance the inning!
-                dailyState.pairIndex++; // Burn the pair
+                // If they previously got a strike on this inning, log red. Otherwise, green!
+                if (dailyState.foul) {
+                    dailyState.history.push('🟥');
+                } else {
+                    dailyState.history.push('🟩');
+                }
+                dailyState.foul = false; // Reset the foul for the next inning
+                dailyState.inning++; // Advance to the next inning!
+                dailyState.pairIndex++; 
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
                 score++;
@@ -549,8 +558,10 @@
             
             if (style === 'daily') {
                 dailyState.strikes++;
-                dailyState.history.push('🟥');
-                dailyState.pairIndex++; // Burn the pair, but the inning stays the same!
+                dailyState.foul = true; // Mark the inning as fouled, but do NOT increment the inning
+                if (dailyState.strikes >= 3) {
+                    dailyState.history.push('🟥'); // Cap off history with the final fatal strike
+                }
             }
             
             document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
@@ -563,25 +574,30 @@
             }
         }
 
-        // SAVE DAILY STATE TO THE BROWSER
+        // SAVE STATE
         if (style === 'daily') {
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
 
-        setTimeout(() => {
+        // 1.8 SECOND TIMEOUT LOGIC
+        roundTimeout = setTimeout(() => {
             if (style === 'daily') {
                 if (dailyState.strikes >= 3) {
                     dailyState.over = true; dailyState.won = false;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     showGameOver();
-                } else if (dailyState.inning > 9) { // Won the 9th inning!
+                } else if (isCorrect && dailyState.inning > 9) { // Won the 9th inning!
                     dailyState.over = true; dailyState.won = true;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     
                     if (!isMuted) { sfxCheer.currentTime = 0; sfxCheer.play().catch(e=>console.log("Audio prevented")); }
                     showGameOver();
-                } else {
+                } else if (isCorrect) {
                     nextRound();
+                } else {
+                    // NEW: If they got it wrong but haven't struck out, just unlock the board!
+                    // This lets them click the correct player without advancing the inning.
+                    busy = false;
                 }
             } else {
                 // Unlimited Mode Logic
@@ -613,7 +629,7 @@
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
-            // Un-hide the emoji grid so they can see their results
+            // UN-HIDE THE EMOJI GRID
             gridDisplay.style.display = 'block';
             gridDisplay.innerText = dailyState.history.join('');
 
@@ -646,7 +662,6 @@
         let text = "";
         
         if (style === 'daily') {
-            // Generate clean text showing off the emojis
             const resultText = dailyState.won ? "beat" : `struck out in Inning ${dailyState.inning} of`;
             text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's game!\n\n${dailyState.history.join("")}\n\nPlay here: ${window.location.href}`;
         } else {
@@ -665,6 +680,10 @@
     }
 
     async function handleModeSwitch() {
+        // FIX: Clear any pending round timers and instantly unlock the board
+        clearTimeout(roundTimeout);
+        busy = false;
+
         if (document.getElementById('play-style').value === 'daily') {
             updateTheme();
             await initDailyMode();
@@ -678,6 +697,10 @@
             document.getElementById('play-style').value = 'unlimited';
         }
 
+        // FIX: Ensure UI resets clean
+        clearTimeout(roundTimeout);
+        busy = false;
+        
         score = 0; strikes = 0; currentStreak = 0; 
         document.getElementById('score').innerText = "0";
         document.getElementById('strikes').innerText = "⚪⚪⚪";
