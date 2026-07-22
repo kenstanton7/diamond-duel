@@ -159,7 +159,7 @@
         .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* THE NEW VISUAL WORDLE GRID */
+        /* THE VISUAL WORDLE GRID */
         #daily-grid-display {
             display: none; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 15px auto; max-width: 320px;
         }
@@ -248,7 +248,6 @@
         <h1 id="game-over-title" style="color:var(--header-bg); margin-bottom: 0;">YOU'RE OUT!</h1>
         <h2 id="final-score-display" style="color:var(--accent-color); margin-top: 0;">Score: 0</h2>
         
-        <!-- The Visual Square Grid -->
         <div id="daily-grid-display"></div>
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
@@ -273,7 +272,7 @@
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
-    let dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false, foul: false };
+    let dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
 
     const sfxCrack = new Audio('crack.mp3');
     const sfxPop = new Audio('pop.mp3');
@@ -281,7 +280,6 @@
     const sfxCheer = new Audio('cheer.mp3'); 
     sfxCrack.volume = 0.6; sfxPop.volume = 0.5; sfxRoar.volume = 0.4; sfxCheer.volume = 0.6; 
 
-    // ORDINAL NUMBER HELPER (1st, 2nd, 3rd, 4th, etc.)
     function getOrdinal(n) {
         let s = ["th", "st", "nd", "rd"];
         let v = n % 100;
@@ -434,9 +432,8 @@
         let saved = localStorage.getItem(dailyKey);
         if (saved) {
             dailyState = JSON.parse(saved);
-            if (dailyState.foul === undefined) dailyState.foul = false; 
         } else {
-            dailyState = { inning: 1, pairIndex: 0, strikes: 0, history: [], over: false, won: false, foul: false };
+            dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
         }
 
         const seedStr = dailyKey;
@@ -502,7 +499,8 @@
         let p1, p2, stat1, stat2;
 
         if (style === 'daily') {
-            let currentPair = dailyPairs[dailyState.pairIndex]; 
+            // Arrays are 0-indexed, innings start at 1
+            let currentPair = dailyPairs[dailyState.inning - 1]; 
             p1 = currentPair.p1; p2 = currentPair.p2; stat1 = currentPair.stat1; stat2 = currentPair.stat2;
         } else {
             p1 = pool[Math.floor(Math.random() * pool.length)];
@@ -534,9 +532,6 @@
 
     function makeGuess(side) {
         if(busy) return;
-        
-        if (document.getElementById(`card-${side}`).classList.contains('wrong')) return; 
-        
         busy = true;
         const mode = document.getElementById('game-mode').value;
         const style = document.getElementById('play-style').value;
@@ -552,12 +547,8 @@
         if(isCorrect) {
             currentStreak++; 
             if (style === 'daily') {
-                if (dailyState.foul) { dailyState.history.push('🟥'); } 
-                else { dailyState.history.push('🟩'); }
-                
-                dailyState.foul = false; 
-                dailyState.inning++; 
-                dailyState.pairIndex++; 
+                dailyState.history.push('🟩');
+                dailyState.inning++; // Advance regardless
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
                 score++;
@@ -582,11 +573,11 @@
             
             if (style === 'daily') {
                 dailyState.strikes++;
-                dailyState.foul = true; 
-                if (dailyState.strikes >= 3) {
-                    dailyState.history.push('🟥'); 
-                }
+                dailyState.history.push('🟥');
+                dailyState.inning++; // Advance regardless
+                
                 document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
+                document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
                 strikes++;
                 document.getElementById('strikes').innerText = "❌".repeat(strikes) + "⚪".repeat(3-strikes);
@@ -611,16 +602,14 @@
                     dailyState.over = true; dailyState.won = false;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     showGameOver();
-                } else if (isCorrect && dailyState.inning > 9) {
+                } else if (dailyState.inning > 9) {
                     dailyState.over = true; dailyState.won = true;
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     
                     if (!isMuted) { sfxCheer.currentTime = 0; sfxCheer.play().catch(e=>console.log("Audio prevented")); }
                     showGameOver();
-                } else if (isCorrect) {
-                    nextRound();
                 } else {
-                    busy = false;
+                    nextRound(); // Since right or wrong advances the inning, we always load next
                 }
             } else {
                 if(strikes >= 3) {
@@ -651,21 +640,16 @@
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
-            // RENDER THE VISUAL GRID SQUARES WITH INNING LABELS
+            // RENDER THE VISUAL GRID SQUARES - Perfectly matches the index now
             gridDisplay.style.display = 'flex';
             gridDisplay.innerHTML = ''; 
             
-            let currentInningLabel = 1;
             for (let i = 0; i < dailyState.history.length; i++) {
                 let res = dailyState.history[i];
                 let square = document.createElement('div');
                 square.className = 'wordle-square ' + (res === '🟩' ? 'correct' : 'wrong');
-                square.innerText = getOrdinal(currentInningLabel);
+                square.innerText = getOrdinal(i + 1); // Exact mapping to 1st, 2nd, etc.
                 gridDisplay.appendChild(square);
-                
-                if (res === '🟩') {
-                    currentInningLabel++;
-                }
             }
 
             if (dailyState.won) {
@@ -675,8 +659,8 @@
             } else {
                 title.innerText = "3 STRIKES, YOU'RE OUT!";
                 title.style.color = "var(--header-bg)";
-                // GRAMMAR FIX: "the 4th inning!"
-                display.innerText = `You made it to the ${getOrdinal(dailyState.inning)} inning!`;
+                // Let the user know the last inning they played before striking out
+                display.innerText = `You made it to the ${getOrdinal(dailyState.inning - 1)} inning!`;
             }
             btn.innerText = "PLAY UNLIMITED MODE";
         } else {
@@ -698,29 +682,15 @@
         let text = "";
         
         if (style === 'daily') {
-            // BUILD THE SOCIAL SHARE TEXT (Line by line, sorted by inning)
+            // BUILD THE SOCIAL SHARE TEXT
             let shareLines = [];
-            let curInn = 1;
-            let currentLine = getOrdinal(curInn) + ": ";
-            
             for (let i = 0; i < dailyState.history.length; i++) {
                 let res = dailyState.history[i];
-                currentLine += res;
-                if (res === '🟩') {
-                    shareLines.push(currentLine);
-                    curInn++;
-                    if (curInn <= 9 && i < dailyState.history.length - 1) {
-                        currentLine = getOrdinal(curInn) + ": ";
-                    } else {
-                        currentLine = "";
-                    }
-                }
+                shareLines.push(getOrdinal(i + 1) + ": " + res);
             }
-            // Catch any lingering strikes if they struck out on the final round
-            if (currentLine !== "") { shareLines.push(currentLine); }
             
             const gridText = shareLines.join('\n');
-            const resultText = dailyState.won ? "beat" : `struck out in the ${getOrdinal(dailyState.inning)} inning of`;
+            const resultText = dailyState.won ? "beat" : `struck out in the ${getOrdinal(dailyState.inning - 1)} inning of`;
             
             text = `⚾ The Diamond Duel - Daily ${modeName} ⚾\nI ${resultText} today's game!\n\n${gridText}\n\nPlay here: ${window.location.href}`;
         } else {
