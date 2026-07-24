@@ -83,7 +83,6 @@
             border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 0.7rem;
         }
 
-        /* NEW: Stats Button Styling */
         .stats-btn {
             position: absolute; right: 155px; top: 50%; transform: translateY(-50%);
             background: var(--vintage-cream); color: #111; border: none; padding: 6px 10px; 
@@ -177,7 +176,7 @@
         .wordle-square.correct { background-color: var(--success-green); box-shadow: 0 3px 0 #1e7e34; }
         .wordle-square.wrong { background-color: #d32f2f; box-shadow: 0 3px 0 #9a1e1e; }
 
-        /* NEW: Statcast Grid Styling */
+        /* Statcast Grid Styling */
         .stats-grid { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
         .stat-item { display: flex; flex-direction: column; align-items: center; width: 65px; }
         .stat-num { font-size: 2.2rem; font-weight: 900; color: var(--header-bg); }
@@ -210,7 +209,6 @@
     <h1 id="main-title">THE DIAMOND DUEL</h1>
     <div id="sub-title" style="font-weight: bold; color: var(--accent-color); letter-spacing: 2px; font-size: 0.8rem; transition: color 0.5s;">HOME RUN SHOWDOWN</div>
     
-    <!-- NEW: Stats Dashboard Button -->
     <button class="stats-btn" onclick="toggleStats(true)">📊 Stats</button>
     <button id="mute-btn" class="mute-btn" onclick="toggleMute()">🔊 Sound</button>
     <button class="help-btn" onclick="toggleInstructions(true)">Rules</button>
@@ -243,11 +241,10 @@
     </div>
 </div>
 
-<!-- NEW: Stats Dashboard Modal -->
 <div id="stats-modal" class="modal">
     <div class="modal-content">
         <h2 style="font-family: 'Impact'; color: var(--header-bg); font-size: 2.5rem; margin-top:0; margin-bottom: 5px;">STATCAST</h2>
-        <div style="font-weight: 800; color: var(--accent-color); font-size: 0.9rem; margin-bottom: 15px; text-transform: uppercase;">Daily Mode Lifetime Performance</div>
+        <div id="stat-mode-label" style="font-weight: 800; color: var(--accent-color); font-size: 0.9rem; margin-bottom: 15px; text-transform: uppercase;">Daily Home Run Lifetime Performance</div>
         
         <div class="stats-grid">
             <div class="stat-item"><div class="stat-num" id="stat-played">0</div><div class="stat-label">Played</div></div>
@@ -320,6 +317,24 @@
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
 
+    // NEW: Odometer Tension Animation
+    function animateValue(obj, start, end, duration) {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            // Ease out quad formula for smooth deceleration
+            const easeProgress = progress * (2 - progress);
+            obj.innerHTML = Math.floor(easeProgress * (end - start) + start);
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                obj.innerHTML = end; // Ensure exact final value is set
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
+
     function cyrb128(str) {
         let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
         for (let i = 0, k; i < str.length; i++) {
@@ -359,12 +374,15 @@
         document.getElementById('high-score').innerText = hs;
     }
 
-    // NEW: Function to manage the Lifetime Daily Stats Dashboard
     function updateLifetimeStats(won) {
-        if (dailyState.statsLogged) return; // Prevent double logging if they refresh after a game ends
+        if (dailyState.statsLogged) return; 
         dailyState.statsLogged = true;
         
-        let stats = JSON.parse(localStorage.getItem('diamond_duel_stats')) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
+        // DYNAMIC: Save stats specific to the selected game mode!
+        const mode = document.getElementById('game-mode').value;
+        const statKey = 'diamond_duel_stats_' + mode;
+        
+        let stats = JSON.parse(localStorage.getItem(statKey)) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
         
         stats.played++;
         if (won) {
@@ -374,21 +392,27 @@
                 stats.maxStreak = stats.currentStreak;
             }
         } else {
-            stats.currentStreak = 0; // Breaking the daily win streak
+            stats.currentStreak = 0; 
         }
         
-        localStorage.setItem('diamond_duel_stats', JSON.stringify(stats));
+        localStorage.setItem(statKey, JSON.stringify(stats));
     }
 
     function toggleStats(show) {
         if (show) {
-            let stats = JSON.parse(localStorage.getItem('diamond_duel_stats')) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
-            document.getElementById('stat-played').innerText = stats.played;
+            const mode = document.getElementById('game-mode').value;
+            const statKey = 'diamond_duel_stats_' + mode;
+            let stats = JSON.parse(localStorage.getItem(statKey)) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
             
-            // Calculate Win % accurately
+            let modeName = "Home Run";
+            if (mode === "hits") modeName = "Hit";
+            if (mode === "strikeOuts") modeName = "Strikeout";
+            
+            document.getElementById('stat-mode-label').innerText = `Daily ${modeName} Lifetime Performance`;
+            
+            document.getElementById('stat-played').innerText = stats.played;
             let winPct = stats.played > 0 ? Math.round((stats.wins / stats.played) * 100) : 0;
             document.getElementById('stat-winpct').innerText = winPct;
-            
             document.getElementById('stat-streak').innerText = stats.currentStreak;
             document.getElementById('stat-maxstreak').innerText = stats.maxStreak;
         }
@@ -502,7 +526,6 @@
         let saved = localStorage.getItem(dailyKey);
         if (saved) {
             dailyState = JSON.parse(saved);
-            // Patch logic for returning users with older localstorage objects
             if (dailyState.statsLogged === undefined) dailyState.statsLogged = false;
         } else {
             dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false, statsLogged: false };
@@ -609,8 +632,10 @@
         
         const isCorrect = (side === 'left' && leftData.val >= rightData.val) || (side === 'right' && rightData.val >= leftData.val);
         
-        document.getElementById('hr-left').innerText = leftData.val;
-        document.getElementById('hr-right').innerText = rightData.val;
+        // NEW: ODOMETER TENSION REVEAL
+        animateValue(document.getElementById('hr-left'), 0, leftData.val, 1200);
+        animateValue(document.getElementById('hr-right'), 0, rightData.val, 1200);
+        
         document.querySelectorAll('.hr-reveal, .label-text').forEach(el => el.style.visibility = 'visible');
 
         const statusBar = document.getElementById('status-bar');
@@ -667,6 +692,7 @@
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
 
+        // Extended timeout slightly to accommodate the smooth Odometer reveal
         roundTimeout = setTimeout(() => {
             if (style === 'daily') {
                 if (dailyState.strikes >= 3) {
@@ -698,7 +724,7 @@
                     showGameOver();
                 } else { nextRound(); }
             }
-        }, 1800);
+        }, 2200);
     }
 
     function showGameOver() {
