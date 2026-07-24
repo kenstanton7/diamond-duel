@@ -163,7 +163,7 @@
         .next-daily-btn { background: var(--header-bg); color: var(--text-gold); font-size: 0.85rem; padding: 10px; flex: 1; border: 2px solid var(--accent-color); transition: background 0.3s; }
         .next-daily-btn:hover { background: var(--accent-color); }
 
-        .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; width: 100%; }
+        .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .btn-social { color: white; font-size: 0.8rem; padding: 10px; }
 
         .spinner { border: 8px solid rgba(0,0,0,0.1); border-top: 8px solid var(--accent-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 20px auto; }
@@ -289,7 +289,6 @@
         
         <button id="play-again-btn" class="btn close-modal" onclick="resetGame()" style="margin-top: 10px;">PLAY AGAIN</button>
 
-        <!-- NEW: Cross-promotion for the other Daily Modes -->
         <div id="next-daily-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 15px; border-top: 2px solid var(--card-border); padding-top: 15px;">
             <div style="font-weight: 800; font-size: 0.85rem; color: var(--header-bg); text-transform: uppercase;">Play the other Daily Modes:</div>
             <div style="display: flex; gap: 10px; justify-content: center;">
@@ -298,12 +297,17 @@
             </div>
         </div>
         
-        <div class="share-grid">
-            <button class="btn btn-social" style="background:#555" onclick="share('copy')">📋 Copy Text</button>
-            <button class="btn btn-social" style="background:#25D366" onclick="share('wa')">WhatsApp</button>
-            <button class="btn btn-social" style="background:#000000" onclick="share('x')">X (Twitter)</button>
-            <button class="btn btn-social" style="background:#E1306C" onclick="share('ig')">Instagram</button>
+        <!-- SEPARATED SHARE SECTION -->
+        <div id="share-section" style="margin-top: 15px; border-top: 2px solid var(--card-border); padding-top: 15px;">
+            <div style="font-weight: 800; font-size: 0.85rem; color: var(--header-bg); text-transform: uppercase; margin-bottom: 10px;">SHARE YOUR SCORE!</div>
+            <div class="share-grid">
+                <button class="btn btn-social" style="background:#555" onclick="share('copy')">📋 Copy Text</button>
+                <button class="btn btn-social" style="background:#25D366" onclick="share('wa')">WhatsApp</button>
+                <button class="btn btn-social" style="background:#000000" onclick="share('x')">X (Twitter)</button>
+                <button class="btn btn-social" style="background:#E1306C" onclick="share('ig')">Instagram</button>
+            </div>
         </div>
+
     </div>
 </div>
 
@@ -735,7 +739,6 @@
         }, 2200);
     }
 
-    // NEW: Trigger to seamlessly switch into a different daily mode
     function switchDailyMode(newMode) {
         document.getElementById('game-mode').value = newMode;
         document.getElementById('play-style').value = 'daily';
@@ -751,6 +754,7 @@
         const btn = document.getElementById('play-again-btn');
         const gridDisplay = document.getElementById('daily-grid-display');
         const nextDailyContainer = document.getElementById('next-daily-container');
+        const shareSection = document.getElementById('share-section');
 
         document.getElementById('status-bar').classList.remove('on-fire');
 
@@ -776,13 +780,11 @@
                 display.innerText = `You made it to the ${getOrdinal(dailyState.inning - 1)} inning!`;
             }
             
-            // Format Unlimited text based on current mode
             let modeLabel = "HOME RUNS";
             if (mode === "hits") modeLabel = "HITS";
             if (mode === "strikeOuts") modeLabel = "STRIKEOUTS";
             btn.innerText = `PLAY UNLIMITED ${modeLabel}`;
 
-            // Configure the cross-promotion buttons
             nextDailyContainer.style.display = 'flex';
             const allModes = [
                 { id: 'homeRuns', label: 'Home Runs' },
@@ -799,6 +801,8 @@
             btn2.innerText = "DAILY " + otherModes[1].label.toUpperCase();
             btn2.onclick = () => switchDailyMode(otherModes[1].id);
 
+            shareSection.style.display = 'block';
+
         } else {
             gridDisplay.style.display = 'none';
             nextDailyContainer.style.display = 'none';
@@ -806,6 +810,7 @@
             title.style.color = "var(--header-bg)";
             display.innerText = "SCORE: " + score;
             btn.innerText = "PLAY AGAIN";
+            shareSection.style.display = 'block';
         }
         
         modal.style.display = 'flex';
@@ -850,7 +855,7 @@
         currentRoundToken++; 
 
         document.getElementById('loading-modal').style.display = 'none';
-        document.getElementById('game-over-modal').style.display = 'none'; // Ensure modal hides when transitioning
+        document.getElementById('game-over-modal').style.display = 'none';
 
         if (document.getElementById('play-style').value === 'daily') {
             updateTheme();
