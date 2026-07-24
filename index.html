@@ -83,6 +83,13 @@
             border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 0.7rem;
         }
 
+        /* NEW: Stats Button Styling */
+        .stats-btn {
+            position: absolute; right: 155px; top: 50%; transform: translateY(-50%);
+            background: var(--vintage-cream); color: #111; border: none; padding: 6px 10px; 
+            border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 0.7rem;
+        }
+
         .stats-bar {
             display: flex; justify-content: center; gap: 30px; margin: 10px 0; background: var(--vintage-cream); 
             padding: 10px 30px; border-radius: 5px; border: 3px solid var(--header-bg); 
@@ -170,11 +177,18 @@
         .wordle-square.correct { background-color: var(--success-green); box-shadow: 0 3px 0 #1e7e34; }
         .wordle-square.wrong { background-color: #d32f2f; box-shadow: 0 3px 0 #9a1e1e; }
 
+        /* NEW: Statcast Grid Styling */
+        .stats-grid { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; width: 65px; }
+        .stat-num { font-size: 2.2rem; font-weight: 900; color: var(--header-bg); }
+        .stat-label { font-size: 0.7rem; font-weight: 700; color: #666; text-transform: uppercase; text-align: center; line-height: 1.1; }
+
         @media (max-width: 600px) { 
             h1 { font-size: 1.8rem; } 
             .dropdown-container { position: relative; left: 0; transform: none; margin-bottom: 5px; top: 0; align-items: center; flex-direction: row; justify-content: center; }
             .help-btn { right: 10px; padding: 6px 8px; }
-            .mute-btn { right: 70px; padding: 6px 8px; }
+            .mute-btn { right: 65px; padding: 6px 8px; }
+            .stats-btn { right: 130px; padding: 6px 8px; }
         }
     </style>
 </head>
@@ -195,6 +209,9 @@
     
     <h1 id="main-title">THE DIAMOND DUEL</h1>
     <div id="sub-title" style="font-weight: bold; color: var(--accent-color); letter-spacing: 2px; font-size: 0.8rem; transition: color 0.5s;">HOME RUN SHOWDOWN</div>
+    
+    <!-- NEW: Stats Dashboard Button -->
+    <button class="stats-btn" onclick="toggleStats(true)">📊 Stats</button>
     <button id="mute-btn" class="mute-btn" onclick="toggleMute()">🔊 Sound</button>
     <button class="help-btn" onclick="toggleInstructions(true)">Rules</button>
 </header>
@@ -223,6 +240,23 @@
         </div>
         <div class="player-name" id="name-right">SELECTING...</div>
         <div class="hr-container"><div class="label-text">Career Home Runs</div><div class="hr-reveal" id="hr-right">0</div></div>
+    </div>
+</div>
+
+<!-- NEW: Stats Dashboard Modal -->
+<div id="stats-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="font-family: 'Impact'; color: var(--header-bg); font-size: 2.5rem; margin-top:0; margin-bottom: 5px;">STATCAST</h2>
+        <div style="font-weight: 800; color: var(--accent-color); font-size: 0.9rem; margin-bottom: 15px; text-transform: uppercase;">Daily Mode Lifetime Performance</div>
+        
+        <div class="stats-grid">
+            <div class="stat-item"><div class="stat-num" id="stat-played">0</div><div class="stat-label">Played</div></div>
+            <div class="stat-item"><div class="stat-num" id="stat-winpct">0</div><div class="stat-label">Win %</div></div>
+            <div class="stat-item"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">Current<br>Streak</div></div>
+            <div class="stat-item"><div class="stat-num" id="stat-maxstreak">0</div><div class="stat-label">Max<br>Streak</div></div>
+        </div>
+        
+        <button class="btn close-modal" onclick="toggleStats(false)" style="margin-top: 15px;">CLOSE DASHBOARD</button>
     </div>
 </div>
 
@@ -272,7 +306,7 @@
 
     // DAILY MODE VARIABLES
     let dailyPairs = [];
-    let dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+    let dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false, statsLogged: false };
 
     const sfxCrack = new Audio('crack.mp3');
     const sfxPop = new Audio('pop.mp3');
@@ -323,6 +357,42 @@
     function updateHighScoreDisplay() {
         let hs = localStorage.getItem(getHighScoreKey()) || 0;
         document.getElementById('high-score').innerText = hs;
+    }
+
+    // NEW: Function to manage the Lifetime Daily Stats Dashboard
+    function updateLifetimeStats(won) {
+        if (dailyState.statsLogged) return; // Prevent double logging if they refresh after a game ends
+        dailyState.statsLogged = true;
+        
+        let stats = JSON.parse(localStorage.getItem('diamond_duel_stats')) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
+        
+        stats.played++;
+        if (won) {
+            stats.wins++;
+            stats.currentStreak++;
+            if (stats.currentStreak > stats.maxStreak) {
+                stats.maxStreak = stats.currentStreak;
+            }
+        } else {
+            stats.currentStreak = 0; // Breaking the daily win streak
+        }
+        
+        localStorage.setItem('diamond_duel_stats', JSON.stringify(stats));
+    }
+
+    function toggleStats(show) {
+        if (show) {
+            let stats = JSON.parse(localStorage.getItem('diamond_duel_stats')) || { played: 0, wins: 0, currentStreak: 0, maxStreak: 0 };
+            document.getElementById('stat-played').innerText = stats.played;
+            
+            // Calculate Win % accurately
+            let winPct = stats.played > 0 ? Math.round((stats.wins / stats.played) * 100) : 0;
+            document.getElementById('stat-winpct').innerText = winPct;
+            
+            document.getElementById('stat-streak').innerText = stats.currentStreak;
+            document.getElementById('stat-maxstreak').innerText = stats.maxStreak;
+        }
+        document.getElementById('stats-modal').style.display = show ? 'flex' : 'none';
     }
 
     function checkPools() {
@@ -432,8 +502,10 @@
         let saved = localStorage.getItem(dailyKey);
         if (saved) {
             dailyState = JSON.parse(saved);
+            // Patch logic for returning users with older localstorage objects
+            if (dailyState.statsLogged === undefined) dailyState.statsLogged = false;
         } else {
-            dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false };
+            dailyState = { inning: 1, strikes: 0, history: [], over: false, won: false, statsLogged: false };
         }
 
         const seedStr = dailyKey;
@@ -499,7 +571,6 @@
         let p1, p2, stat1, stat2;
 
         if (style === 'daily') {
-            // Arrays are 0-indexed, innings start at 1
             let currentPair = dailyPairs[dailyState.inning - 1]; 
             p1 = currentPair.p1; p2 = currentPair.p2; stat1 = currentPair.stat1; stat2 = currentPair.stat2;
         } else {
@@ -548,7 +619,7 @@
             currentStreak++; 
             if (style === 'daily') {
                 dailyState.history.push('🟩');
-                dailyState.inning++; // Advance regardless
+                dailyState.inning++; 
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
             } else {
                 score++;
@@ -574,7 +645,7 @@
             if (style === 'daily') {
                 dailyState.strikes++;
                 dailyState.history.push('🟥');
-                dailyState.inning++; // Advance regardless
+                dailyState.inning++; 
                 
                 document.getElementById('strikes').innerText = "❌".repeat(dailyState.strikes) + "⚪".repeat(3-dailyState.strikes);
                 document.getElementById('score').innerText = `${Math.min(dailyState.inning, 9)}/9`;
@@ -600,16 +671,17 @@
             if (style === 'daily') {
                 if (dailyState.strikes >= 3) {
                     dailyState.over = true; dailyState.won = false;
+                    updateLifetimeStats(false);
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
                     showGameOver();
                 } else if (dailyState.inning > 9) {
                     dailyState.over = true; dailyState.won = true;
+                    updateLifetimeStats(true);
                     localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
-                    
                     if (!isMuted) { sfxCheer.currentTime = 0; sfxCheer.play().catch(e=>console.log("Audio prevented")); }
                     showGameOver();
                 } else {
-                    nextRound(); // Since right or wrong advances the inning, we always load next
+                    nextRound(); 
                 }
             } else {
                 if(strikes >= 3) {
@@ -640,7 +712,6 @@
         document.getElementById('status-bar').classList.remove('on-fire');
 
         if (style === 'daily') {
-            // RENDER THE VISUAL GRID SQUARES - Perfectly matches the index now
             gridDisplay.style.display = 'flex';
             gridDisplay.innerHTML = ''; 
             
@@ -648,7 +719,7 @@
                 let res = dailyState.history[i];
                 let square = document.createElement('div');
                 square.className = 'wordle-square ' + (res === '🟩' ? 'correct' : 'wrong');
-                square.innerText = getOrdinal(i + 1); // Exact mapping to 1st, 2nd, etc.
+                square.innerText = getOrdinal(i + 1); 
                 gridDisplay.appendChild(square);
             }
 
@@ -659,7 +730,6 @@
             } else {
                 title.innerText = "3 STRIKES, YOU'RE OUT!";
                 title.style.color = "var(--header-bg)";
-                // Let the user know the last inning they played before striking out
                 display.innerText = `You made it to the ${getOrdinal(dailyState.inning - 1)} inning!`;
             }
             btn.innerText = "PLAY UNLIMITED MODE";
@@ -682,7 +752,6 @@
         let text = "";
         
         if (style === 'daily') {
-            // BUILD THE SOCIAL SHARE TEXT
             let shareLines = [];
             for (let i = 0; i < dailyState.history.length; i++) {
                 let res = dailyState.history[i];
