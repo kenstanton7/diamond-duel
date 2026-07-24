@@ -155,9 +155,13 @@
         @keyframes shake-wrong { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); } }
 
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .modal-content { background: var(--vintage-cream); padding: 30px; max-width: 450px; border: 4px solid var(--header-bg); box-shadow: 10px 10px 0px var(--accent-color); text-align: center; transition: border 0.5s, box-shadow 0.5s; }
+        .modal-content { background: var(--vintage-cream); padding: 30px; max-width: 450px; width: 100%; border: 4px solid var(--header-bg); box-shadow: 10px 10px 0px var(--accent-color); text-align: center; transition: border 0.5s, box-shadow 0.5s; }
         .btn { padding: 12px 20px; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .close-modal { background: var(--accent-color); color: white; font-size: 1.3rem; width: 100%; margin-bottom: 12px; transition: background 0.5s; }
+
+        /* Next Daily Modes Button Styling */
+        .next-daily-btn { background: var(--header-bg); color: var(--text-gold); font-size: 0.85rem; padding: 10px; flex: 1; border: 2px solid var(--accent-color); transition: background 0.3s; }
+        .next-daily-btn:hover { background: var(--accent-color); }
 
         .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; width: 100%; }
         .btn-social { color: white; font-size: 0.8rem; padding: 10px; }
@@ -283,7 +287,16 @@
         
         <div id="new-hs-badge" style="display: none; background: var(--success-green); color: white; padding: 6px 20px; border-radius: 20px; font-weight: 900; font-size: 1rem; margin: -10px auto 15px auto; width: fit-content; animation: pulse-correct 0.8s infinite alternate; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);">🌟 NEW HIGH SCORE! 🌟</div>
         
-        <button id="play-again-btn" class="btn close-modal" onclick="resetGame()">PLAY AGAIN</button>
+        <button id="play-again-btn" class="btn close-modal" onclick="resetGame()" style="margin-top: 10px;">PLAY AGAIN</button>
+
+        <!-- NEW: Cross-promotion for the other Daily Modes -->
+        <div id="next-daily-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 15px; border-top: 2px solid var(--card-border); padding-top: 15px;">
+            <div style="font-weight: 800; font-size: 0.85rem; color: var(--header-bg); text-transform: uppercase;">Play the other Daily Modes:</div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="next-daily-btn-1" class="btn next-daily-btn"></button>
+                <button id="next-daily-btn-2" class="btn next-daily-btn"></button>
+            </div>
+        </div>
         
         <div class="share-grid">
             <button class="btn btn-social" style="background:#555" onclick="share('copy')">📋 Copy Text</button>
@@ -317,19 +330,17 @@
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
 
-    // NEW: Odometer Tension Animation
     function animateValue(obj, start, end, duration) {
         let startTimestamp = null;
         const step = (timestamp) => {
             if (!startTimestamp) startTimestamp = timestamp;
             const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-            // Ease out quad formula for smooth deceleration
             const easeProgress = progress * (2 - progress);
             obj.innerHTML = Math.floor(easeProgress * (end - start) + start);
             if (progress < 1) {
                 window.requestAnimationFrame(step);
             } else {
-                obj.innerHTML = end; // Ensure exact final value is set
+                obj.innerHTML = end; 
             }
         };
         window.requestAnimationFrame(step);
@@ -378,7 +389,6 @@
         if (dailyState.statsLogged) return; 
         dailyState.statsLogged = true;
         
-        // DYNAMIC: Save stats specific to the selected game mode!
         const mode = document.getElementById('game-mode').value;
         const statKey = 'diamond_duel_stats_' + mode;
         
@@ -632,7 +642,6 @@
         
         const isCorrect = (side === 'left' && leftData.val >= rightData.val) || (side === 'right' && rightData.val >= leftData.val);
         
-        // NEW: ODOMETER TENSION REVEAL
         animateValue(document.getElementById('hr-left'), 0, leftData.val, 1200);
         animateValue(document.getElementById('hr-right'), 0, rightData.val, 1200);
         
@@ -692,7 +701,6 @@
             localStorage.setItem(getDailyKey(), JSON.stringify(dailyState));
         }
 
-        // Extended timeout slightly to accommodate the smooth Odometer reveal
         roundTimeout = setTimeout(() => {
             if (style === 'daily') {
                 if (dailyState.strikes >= 3) {
@@ -727,13 +735,22 @@
         }, 2200);
     }
 
+    // NEW: Trigger to seamlessly switch into a different daily mode
+    function switchDailyMode(newMode) {
+        document.getElementById('game-mode').value = newMode;
+        document.getElementById('play-style').value = 'daily';
+        handleModeSwitch();
+    }
+
     function showGameOver() {
+        const mode = document.getElementById('game-mode').value;
         const style = document.getElementById('play-style').value;
         const modal = document.getElementById('game-over-modal');
         const title = document.getElementById('game-over-title');
         const display = document.getElementById('final-score-display');
         const btn = document.getElementById('play-again-btn');
         const gridDisplay = document.getElementById('daily-grid-display');
+        const nextDailyContainer = document.getElementById('next-daily-container');
 
         document.getElementById('status-bar').classList.remove('on-fire');
 
@@ -758,9 +775,33 @@
                 title.style.color = "var(--header-bg)";
                 display.innerText = `You made it to the ${getOrdinal(dailyState.inning - 1)} inning!`;
             }
-            btn.innerText = "PLAY UNLIMITED MODE";
+            
+            // Format Unlimited text based on current mode
+            let modeLabel = "HOME RUNS";
+            if (mode === "hits") modeLabel = "HITS";
+            if (mode === "strikeOuts") modeLabel = "STRIKEOUTS";
+            btn.innerText = `PLAY UNLIMITED ${modeLabel}`;
+
+            // Configure the cross-promotion buttons
+            nextDailyContainer.style.display = 'flex';
+            const allModes = [
+                { id: 'homeRuns', label: 'Home Runs' },
+                { id: 'hits', label: 'Hits' },
+                { id: 'strikeOuts', label: 'Strikeouts' }
+            ];
+            const otherModes = allModes.filter(m => m.id !== mode);
+            
+            const btn1 = document.getElementById('next-daily-btn-1');
+            btn1.innerText = "DAILY " + otherModes[0].label.toUpperCase();
+            btn1.onclick = () => switchDailyMode(otherModes[0].id);
+            
+            const btn2 = document.getElementById('next-daily-btn-2');
+            btn2.innerText = "DAILY " + otherModes[1].label.toUpperCase();
+            btn2.onclick = () => switchDailyMode(otherModes[1].id);
+
         } else {
             gridDisplay.style.display = 'none';
+            nextDailyContainer.style.display = 'none';
             title.innerText = "YOU'RE OUT!";
             title.style.color = "var(--header-bg)";
             display.innerText = "SCORE: " + score;
@@ -809,6 +850,7 @@
         currentRoundToken++; 
 
         document.getElementById('loading-modal').style.display = 'none';
+        document.getElementById('game-over-modal').style.display = 'none'; // Ensure modal hides when transitioning
 
         if (document.getElementById('play-style').value === 'daily') {
             updateTheme();
